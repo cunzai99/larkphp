@@ -472,6 +472,36 @@ class Model
     }
 
     /**
+     * 开启事物
+     *
+     * @return boolean
+     */
+    public function startTrans()
+    {
+        return $this->_db->startTrans();
+    }
+
+    /**
+     * 事物回滚
+     *
+     * @return boolean
+     */
+    public function rollback()
+    {
+        return $this->_db->rollback();
+    }
+
+    /**
+     * 提交sql
+     *
+     * @return boolean
+     */
+    public function commit()
+    {
+        return $this->_db->commit();
+    }
+
+    /**
      * SQL查询
      *
      * @param  mixed $sql    SQL指令
@@ -559,6 +589,17 @@ class Model
     public function getLastSql()
     {
         return $this->_db->getLastSql();
+    }
+
+    /**
+     *
+     * 返回最后执行的sql语句
+     *
+     * @return string
+     */
+    public function getError()
+    {
+        return $this->_db->error();
     }
 
     /**

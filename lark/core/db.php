@@ -91,8 +91,8 @@ class Db
             $this->dbType = strtolower($dbConfig['dbms']);
         }
 
-        // 判断数据库类型(不截取了...)
-        $dbDriver = substr($this->dbType, 0, 3);
+        // 数据库类型
+        $dbDriver = $this->dbType;
 
         // 检查驱动类
         if(!class_exists($dbDriver)) {

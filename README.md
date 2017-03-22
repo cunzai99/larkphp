@@ -33,6 +33,10 @@
 
     $sql = $this->getLastSql();
 
+5、获取sql执行错误信息
+
+    $errorInfo = $this->getError();
+
 #### 插入操作
 
     $insert_id = $this->add($data);
@@ -44,3 +48,15 @@
 #### 删除操作
 
     $res = $this->where(array('id'=>$id))->delete();
+
+#### 开启事物
+
+    $this->startTrans();
+
+#### 事物回滚
+
+    $this->rollback();
+
+#### 提交sql
+
+    $this->commit();

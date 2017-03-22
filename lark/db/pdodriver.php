@@ -1,5 +1,6 @@
 <?php
 namespace Lark\db;
+use Lark\plugin\LarkException;
 
 /**
  * Pdo数据库驱动类
@@ -41,29 +42,29 @@ class PdoDriver extends Abstracts
      *
      * @throws Exception
      */
-    public function connect($config = '', $linkNum = 0)
+    public function connect($config='', $linkNum=0)
     {
-        if (! isset ( $this->linkID [$linkNum] )) {
-            if (empty ( $config )) {
+        if (!isset($this->linkID[$linkNum])) {
+            if (empty($config)) {
                 $config = $this->config;
             }
             if ($this->pconnect) {
-                $config ['params'] [\PDO::ATTR_PERSISTENT] = true;
+                $config['params'][\PDO::ATTR_PERSISTENT] = true;
             }
 
             try {
                 if ('ODBC' == $this->dbType) {
-                    $this->linkID [$linkNum] = new \PDO ( "odbc:Driver={SQL Server}; Server={$config['host']}; Uid={$config['username']}; Pwd={$config['password']}; Database={$config['dbname']};" );
+                    $this->linkID[$linkNum] = new \PDO("odbc:Driver={SQL Server}; Server={$config['host']}; Uid={$config['username']}; Pwd={$config['password']}; Database={$config['dbname']};");
                 } else {
-                    $dsn = strtolower ( $this->dbType ) . ":dbname={$config['dbname']};host={$config['host']};port={$config['port']}";
-                    $this->linkID [$linkNum] = @new \PDO ( $dsn, $config ['username'], $config ['password'], $config ['params'] );
+                    $dsn = strtolower($this->dbType) . ":dbname={$config['dbname']};host={$config['host']};port={$config['port']}";
+                    $this->linkID[$linkNum] = @new \PDO($dsn, $config ['username'], $config['password'], $config['params']);
                 }
-            } catch ( Exception $e ) {
-                throw new Exception ( $e->getMessage () );
+            } catch (LarkException $e) {
+                throw new LarkException($e->getMessage());
             }
             // 因为PDO的连接切换可能导致数据库类型不同，因此重新获取下当前的数据库类型,以下暂没实现相关扩展
-            if (! in_array ($this->dbType, array ('ODBC', 'DBLIB', 'MSSQL', 'ORACLE', 'IBASE', 'OCI') )) {
-                $this->linkID [$linkNum]->exec ( 'SET NAMES ' . $config ['charset'] );
+            if (!in_array($this->dbType, array('ODBC', 'DBLIB', 'MSSQL', 'ORACLE', 'IBASE', 'OCI'))) {
+                $this->linkID[$linkNum]->exec('SET NAMES ' . $config ['charset']);
             }
 
             // 标记连接成功
@@ -72,7 +73,7 @@ class PdoDriver extends Abstracts
             // 注销数据库连接配置信息
             // unset($this->config);
         }
-        return $this->linkID [$linkNum];
+        return $this->linkID[$linkNum];
     }
 
     /**
@@ -86,35 +87,39 @@ class PdoDriver extends Abstracts
     /**
      * 执行查询 返回数据集
      *
-     * @param string $str sql指令
-     * @param string $type 返回数据类型，默认为带下标的二数组
+     * @param  string $str  sql指令
+     * @param  string $type 返回数据类型，默认为带下标的二数组
      * @return mixed
      * @throws Exception
      */
-    public function query($str, $type = 'assoc')
+    public function query($str, $type='assoc')
     {
-        $this->initConnect ( false );
-        if (! $this->_linkID) {
+        $this->initConnect(false);
+        if(!$this->_linkID){
             return false;
         }
+
         $this->queryStr = $str;
+
         // 释放前次的查询结果
-        if (! empty ( $this->PDOStatement )) {
-            $this->free ();
+        if(!empty($this->PDOStatement)){
+            $this->free();
         }
-        $this->Q ( 1 );
 
-        $this->PDOStatement = $this->_linkID->prepare ( $str );
+        $this->Q(1);
 
+        $this->PDOStatement = $this->_linkID->prepare($str);
         if (false === $this->PDOStatement) {
-            throw new Exception ( $this->error () );
+            throw new LarkException($this->error());
         }
-        $result = $this->PDOStatement->execute ();
+
+        $result = $this->PDOStatement->execute();
         $this->debug ();
         if (false === $result) {
-            return false;
+            throw new LarkException($this->error());
+            //return false;
         } else {
-            return $this->getAll ( $type );
+            return $this->getAll($type);
         }
     }
 
@@ -127,37 +132,36 @@ class PdoDriver extends Abstracts
      */
     public function execute($str)
     {
+        //@todo 要不要在这里做这件事
         $str = htmlspecialchars($str);
-        $this->initConnect ( true );
-        if (! $this->_linkID) {
+
+        $this->initConnect(true);
+        if (!$this->_linkID) {
             return false;
-        }
-        $this->queryStr = $str;
-        $flag = false;
-        if ($this->dbType == 'OCI') {
-            if (preg_match ( "/^\s*(INSERT\s+INTO)\s+(\w+)\s+/i", $this->queryStr, $match )) {
-                $this->table = $match [2];
-                $flag = ( boolean ) $this->query ( "SELECT * FROM user_sequences WHERE sequence_name='" . strtoupper ( $this->table ) . "'" );
-            }
-        }
-        // 释放前次的查询结果
-        if (! empty ( $this->PDOStatement )) {
-            $this->free ();
         }
 
-        $this->PDOStatement = $this->_linkID->prepare ( $str );
-        if (false === $this->PDOStatement) {
-            throw new Exception ( $this->error () );
+        $this->queryStr = $str;
+
+        // 释放前次的查询结果
+        if (!empty($this->PDOStatement)) {
+            $this->free();
         }
-        $result = $this->PDOStatement->execute ();
-        $this->debug ();
+
+        $this->PDOStatement = $this->_linkID->prepare($str);
+        if (false === $this->PDOStatement) {
+            throw new LarkException($this->error());
+        }
+
+        $result = $this->PDOStatement->execute();
+        $this->debug();
         if (false === $result) {
-            return false;
+            throw new LarkException($this->error());
+            //return false;
         } else {
             // $this->numRows = $result;
-            $this->numRows = $this->PDOStatement->rowCount ();
-            if ($flag || preg_match ( "/^\s*(INSERT\s+INTO|REPLACE\s+INTO)\s+/i", $str )) {
-                $this->lastInsID = $this->getLastInsertId ();
+            $this->numRows = $this->PDOStatement->rowCount();
+            if (preg_match("/^\s*(INSERT\s+INTO|REPLACE\s+INTO)\s+/i", $str)) {
+                $this->lastInsID = $this->getLastInsertId();
             }
             return $this->numRows;
         }
@@ -170,13 +174,15 @@ class PdoDriver extends Abstracts
      */
     public function startTrans()
     {
-        $this->initConnect ( true );
-        if (! $this->_linkID) {
+        $this->initConnect(true);
+        if (!$this->_linkID) {
             return false;
         }
+
         // 数据rollback 支持
         if ($this->transTimes == 0) {
-            $this->_linkID->beginTransaction ();
+            //$this->_linkID->setAttribute(\PDO::ATTR_AUTOCOMMIT, 0);
+            $this->_linkID->beginTransaction();
         }
         $this->transTimes ++;
         return;
@@ -190,10 +196,10 @@ class PdoDriver extends Abstracts
     public function commit()
     {
         if ($this->transTimes > 0) {
-            $result = $this->_linkID->commit ();
+            $result = $this->_linkID->commit();
             $this->transTimes = 0;
-            if (! $result) {
-                throw new Exception ( $this->error () );
+            if (!$result) {
+                throw new LarkException($this->error());
             }
         }
         return true;
@@ -208,10 +214,11 @@ class PdoDriver extends Abstracts
     public function rollback()
     {
         if ($this->transTimes > 0) {
-            $result = $this->_linkID->rollback ();
+            $result = $this->_linkID->rollback();
+            //var_dump($result); exit;
             $this->transTimes = 0;
-            if (! $result) {
-                throw new Exception ( $this->error () );
+            if (!$result) {
+                throw new Exception ($this->error());
             }
         }
         return true;
@@ -227,13 +234,12 @@ class PdoDriver extends Abstracts
     {
         // 返回数据集
         if ('assoc' == $type) {
-            $result = $this->PDOStatement->fetchAll ( constant ( 'PDO::FETCH_ASSOC' ) );
+            $result = $this->PDOStatement->fetchAll(constant('PDO::FETCH_ASSOC'));
         } else {
-
-            $result = $this->PDOStatement->fetchAll ( constant ( 'PDO::FETCH_NUM' ) );
+            $result = $this->PDOStatement->fetchAll(constant('PDO::FETCH_NUM'));
         }
 
-        $this->numRows = count ( $result );
+        $this->numRows = count($result);
         return $result;
     }
 
@@ -244,7 +250,8 @@ class PdoDriver extends Abstracts
      */
     public function getFields($tableName)
     {
-        $this->initConnect ( true );
+        $this->initConnect(true);
+
         switch ($this->dbType) {
             case 'MSSQL' :
             case 'ODBC' :
@@ -272,18 +279,18 @@ class PdoDriver extends Abstracts
                 $sql = 'DESCRIBE ' . $tableName;
         }
 
-        $result = $this->query ( $sql );
-        $info = array ();
+        $result = $this->query($sql);
+        $info = array();
         if ($result) {
-            foreach ( $result as $key => $val ) {
+            foreach ($result as $key => $val) {
                 $name = strtolower ( isset ( $val ['Field'] ) ? $val ['Field'] : $val ['Name'] );
                 $info [$name] = array (
                         'name' => $name,
                         'type' => $val ['Type'],
-                        'notnull' => ( bool ) (((isset ( $val ['Null'] )) && ($val ['Null'] === '')) || ((isset ( $val ['notnull'] )) && ($val ['notnull'] === ''))), // not null is empty, null is yes
-                        'default' => isset ( $val ['Default'] ) ? $val ['Default'] : (isset ( $val ['dflt_value'] ) ? $val ['dflt_value'] : ""),
-                        'primary' => isset ( $val ['Key'] ) ? strtolower ( $val ['Key'] ) == 'pri' : (isset ( $val ['pk'] ) ? $val ['pk'] : false),
-                        'autoinc' => isset ( $val ['Extra'] ) ? strtolower ( $val ['Extra'] ) == 'auto_increment' : (isset ( $val ['Key'] ) ? $val ['Key'] : false)
+                        'notnull' => (bool) (((isset($val['Null'])) && ($val['Null'] === '')) || ((isset($val['notnull'])) && ($val['notnull'] === ''))), // not null is empty, null is yes
+                        'default' => isset($val['Default'] ) ? $val['Default'] : (isset($val['dflt_value'] ) ? $val['dflt_value'] : ""),
+                        'primary' => isset($val['Key'] ) ? strtolower ( $val['Key'] ) == 'pri' : (isset($val['pk'] ) ? $val['pk'] : false),
+                        'autoinc' => isset($val['Extra'] ) ? strtolower ( $val['Extra'] ) == 'auto_increment' : (isset ( $val['Key'] ) ? $val['Key'] : false)
                 );
             }
         }
@@ -319,17 +326,17 @@ class PdoDriver extends Abstracts
                 break;
             case 'MYSQL' :
             default :
-                if (! empty ( $dbName )) {
+                if (!empty($dbName)) {
                     $sql = 'SHOW TABLES FROM ' . $dbName;
                 } else {
                     $sql = 'SHOW TABLES ';
                 }
         }
 
-        $result = $this->query ( $sql );
-        $info = array ();
-        foreach ( $result as $key => $val ) {
-            $info [$key] = current ( $val );
+        $result = $this->query($sql);
+        $info = array();
+        foreach($result as $key => $val) {
+            $info[$key] = current($val);
         }
         return $info;
     }
@@ -343,11 +350,11 @@ class PdoDriver extends Abstracts
     protected function parseLimit($limit)
     {
         $limitStr = '';
-        if (! empty ( $limit )) {
+        if (!empty($limit)) {
             switch ($this->dbType) {
                 case 'PGSQL' :
                 case 'SQLITE' :
-                    $limit = explode ( ',', $limit );
+                    $limit = explode (',', $limit);
                     if (count ( $limit ) > 1) {
                         $limitStr .= ' LIMIT ' . $limit [1] . ' OFFSET ' . $limit [0] . ' ';
                     } else {
@@ -382,7 +389,7 @@ class PdoDriver extends Abstracts
      */
     protected function mssqlLimit($sql, $limit)
     {
-        if (empty ( $limit ) || ! in_array ( $this->dbType, array (
+        if (empty($limit) || !in_array($this->dbType, array (
                 'DBLIB',
                 'ODBC',
                 'MSSQL'
@@ -390,51 +397,51 @@ class PdoDriver extends Abstracts
             return $sql;
         }
 
-        $limit = explode ( ',', $limit );
-        if (count ( $limit ) > 1) {
-            $count = $limit [1];
-            $offset = $limit [0];
+        $limit = explode(',', $limit);
+        if (count($limit) > 1) {
+            $count  = $limit[1];
+            $offset = $limit[0];
         } else {
-            $count = $limit [0];
+            $count  = $limit[0];
             $offset = 0;
         }
 
-        $count = intval ( $count );
+        $count = intval($count);
         if ($count <= 0) {
-            throw new Exception ( "LIMIT argument count=$count is not valid" );
+            throw new LarkException("LIMIT argument count=$count is not valid");
         }
 
-        $offset = intval ( $offset );
+        $offset = intval($offset);
         if ($offset < 0) {
-            throw new Exception ( "LIMIT argument offset=$offset is not valid" );
+            throw new LarkException("LIMIT argument offset=$offset is not valid");
         }
 
-        $sql = preg_replace ( '/^SELECT\s+(DISTINCT\s)?/i', 'SELECT $1TOP ' . ($count + $offset) . ' ', $sql );
+        $sql = preg_replace('/^SELECT\s+(DISTINCT\s)?/i', 'SELECT $1TOP ' . ($count + $offset) . ' ', $sql);
 
         if ($offset > 0) {
-            $orderby = stristr ( $sql, 'ORDER BY' );
+            $orderby = stristr($sql, 'ORDER BY');
 
             if ($orderby !== false) {
-                $orderParts = explode ( ',', substr ( $orderby, 8 ) );
+                $orderParts = explode(',', substr($orderby, 8));
                 $pregReplaceCount = null;
-                $orderbyInverseParts = array ();
+                $orderbyInverseParts = array();
                 foreach ( $orderParts as $orderPart ) {
-                    $orderPart = rtrim ( $orderPart );
-                    $inv = preg_replace ( '/\s+desc$/i', ' ASC', $orderPart, 1, $pregReplaceCount );
+                    $orderPart = rtrim($orderPart);
+                    $inv = preg_replace('/\s+desc$/i', ' ASC', $orderPart, 1, $pregReplaceCount);
                     if ($pregReplaceCount) {
-                        $orderbyInverseParts [] = $inv;
+                        $orderbyInverseParts[] = $inv;
                         continue;
                     }
-                    $inv = preg_replace ( '/\s+asc$/i', ' DESC', $orderPart, 1, $pregReplaceCount );
+                    $inv = preg_replace('/\s+asc$/i', ' DESC', $orderPart, 1, $pregReplaceCount);
                     if ($pregReplaceCount) {
-                        $orderbyInverseParts [] = $inv;
+                        $orderbyInverseParts[] = $inv;
                         continue;
                     } else {
-                        $orderbyInverseParts [] = $orderPart . ' DESC';
+                        $orderbyInverseParts[] = $orderPart . ' DESC';
                     }
                 }
 
-                $orderbyInverse = 'ORDER BY ' . implode ( ', ', $orderbyInverseParts );
+                $orderbyInverse = 'ORDER BY ' . implode(', ', $orderbyInverseParts);
             }
 
             $sql = 'SELECT * FROM (SELECT TOP ' . $count . ' * FROM (' . $sql . ') AS inner_tbl';
@@ -469,9 +476,9 @@ class PdoDriver extends Abstracts
     {
         $this->error = '';
         if ($this->PDOStatement) {
-            $error = $this->PDOStatement->errorInfo ();
-            if (isset ( $error [2] ))
-                $this->error = $error [2];
+            $error = $this->PDOStatement->errorInfo();
+            if (isset($error[2]))
+                $this->error = $error[2];
         }
 
         return $this->error;
@@ -495,13 +502,13 @@ class PdoDriver extends Abstracts
             case 'IBASE' :
             case 'DBLIB' :
             case 'ODBC' :
-                return str_ireplace ( "'", "''", $str );
+                return str_ireplace("'", "''", $str);
             case 'MYSQL' :
             default :
                 if (__MAGIC_QUOTES_GPC__) {
                     return $str;
                 } else {
-                    return addslashes ( $str );
+                    return addslashes($str);
                 }
         }
     }
@@ -520,20 +527,20 @@ class PdoDriver extends Abstracts
             case 'DBLIB' :
                 $sql = 'SELECT @@IDENTITY AS currval';
                 // $sql = 'SELECT SCOPE_IDENTITY() AS currval';
-                $this->PDOStatement = $this->_linkID->prepare ( $sql );
-                $result = $this->PDOStatement->execute ();
-                $vo = $this->getAll ( 'assoc' );
-                return $vo ? $vo [0] ["currval"] : 0;
+                $this->PDOStatement = $this->_linkID->prepare($sql);
+                $result = $this->PDOStatement->execute();
+                $vo = $this->getAll('assoc');
+                return $vo ? $vo[0]["currval"] : 0;
             case 'PGSQL' :
             case 'SQLITE' :
             case 'IBASE' :
             case 'MYSQL' :
-                return $this->_linkID->lastInsertId ();
+                return $this->_linkID->lastInsertId();
             case 'ORACLE' :
             case 'OCI' :
                 $sequenceName = $this->table;
-                $vo = $this->query ( "SELECT {$sequenceName}.currval currval FROM dual" );
-                return $vo ? $vo [0] ["currval"] : 0;
+                $vo = $this->query("SELECT {$sequenceName}.currval currval FROM dual");
+                return $vo ? $vo[0]["currval"] : 0;
         }
     }
 
